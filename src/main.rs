@@ -59,25 +59,43 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 2 {
-        eprintln!("Użycie: {} [-r] /ścieżka/do/katalogu [ścieżka/do/katalogu_docelowego]", args[0]);
+        eprintln!("Użycie: {} <komenda> [opcje]", args[0]);
+        eprintln!("Dostępne komendy:");
+        eprintln!("  dupes [-r] <katalog> [katalog_docelowy]  - Znajduje i przenosi/usuwa duplikaty");
         std::process::exit(1);
     }
 
-    let (remove_mode, directory, target_directory) = if args[1] == "-r" {
-        if args.len() < 3 {
-            eprintln!("Musisz podać katalog do przeszukania.");
-            std::process::exit(1);
-        }
-        (true, &args[2], None)
-    } else {
-        if args.len() < 3 {
-            eprintln!("Musisz podać katalog do przeszukania i katalog docelowy.");
-            std::process::exit(1);
-        }
-        (false, &args[1], Some(&args[2]))
-    };
+    match args[1].as_str() {
+        "dupes" => {
+            if args.len() < 3 {
+                eprintln!("Musisz podać katalog do przeszukania.");
+                std::process::exit(1);
+            }
 
-    if let Err(err) = process_duplicates(directory, target_directory.map(|s| s.as_str()), remove_mode) {
-        eprintln!("Błąd: {}", err);
+            let (remove_mode, directory, target_directory) = if args[2] == "-r" {
+                if args.len() < 4 {
+                    eprintln!("Musisz podać katalog do przeszukania.");
+                    std::process::exit(1);
+                }
+                (true, &args[3], None)
+            } else {
+                if args.len() < 4 {
+                    eprintln!("Musisz podać katalog do przeszukania i katalog docelowy.");
+                    std::process::exit(1);
+                }
+                (false, &args[2], Some(&args[3]))
+            };
+
+            if let Err(err) = process_duplicates(directory, target_directory.map(|s| s.as_str()), remove_mode) {
+                eprintln!("Błąd: {}", err);
+            }
+        }
+        "rename" => {
+            println!("Funkcja 'rename' nie jest jeszcze zaimplementowana.");
+        }
+        _ => {
+            eprintln!("Nieznana komenda: {}", args[1]);
+            std::process::exit(1);
+        }
     }
 }
