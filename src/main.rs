@@ -15,15 +15,18 @@ fn compute_sha256(file_path: &Path) -> io::Result<String> {
     Ok(format!("{:x}", hash_result))
 }
 
-fn process_duplicates(directory: &str, target_dir: Option<&str>, remove: bool) -> io::Result<()> {
+fn process_duplicates(directory: &str, target_dir: Option<&str>) -> io::Result<()> {
     let mut checksums: HashMap<String, String> = HashMap::new();
 
-    if let Some(target_path) = target_dir {
+    let target_path = if let Some(target_path) = target_dir {
         let target_path = Path::new(target_path);
         if !target_path.exists() {
             fs::create_dir_all(target_path)?;
         }
-    }
+        Some(target_path)
+    } else {
+        None
+    };
 
     for entry in WalkDir::new(directory).into_iter().filter_map(Result::ok) {
         let path = entry.path();
@@ -31,18 +34,19 @@ fn process_duplicates(directory: &str, target_dir: Option<&str>, remove: bool) -
         if path.is_file() {
             match compute_sha256(path) {
                 Ok(sha256) => {
-                    if checksums.contains_key(&sha256) {
-                        if remove {
-                            fs::remove_file(path)?;
-                        } else if let Some(target_path) = target_dir {
+                    if let Some(existing_path) = checksums.get(&sha256) {
+                        if path.to_string_lossy().len() < existing_path.len() {
                             let relative_path = path.strip_prefix(directory).unwrap_or(path);
-                            let new_path = Path::new(target_path).join(relative_path);
+                            let new_path = target_path.unwrap().join(relative_path);
 
                             if let Some(parent) = new_path.parent() {
                                 fs::create_dir_all(parent)?;
                             }
 
                             fs::rename(path, new_path)?;
+                            checksums.insert(sha256, path.to_string_lossy().to_string());
+                        } else {
+                            fs::remove_file(path)?;
                         }
                     } else {
                         checksums.insert(sha256, path.to_string_lossy().to_string());
@@ -72,21 +76,21 @@ fn main() {
                 std::process::exit(1);
             }
 
-            let (remove_mode, directory, target_directory) = if args[2] == "-r" {
+            let (directory, target_directory) = if args[2] == "-r" {
                 if args.len() < 4 {
                     eprintln!("Musisz podać katalog do przeszukania.");
                     std::process::exit(1);
                 }
-                (true, &args[3], None)
+                (&args[3], None)
             } else {
                 if args.len() < 4 {
                     eprintln!("Musisz podać katalog do przeszukania i katalog docelowy.");
                     std::process::exit(1);
                 }
-                (false, &args[2], Some(&args[3]))
+                (&args[2], Some(&args[3]))
             };
 
-            if let Err(err) = process_duplicates(directory, target_directory.map(|s| s.as_str()), remove_mode) {
+            if let Err(err) = process_duplicates(directory, target_directory.map(|s| s.as_str())) {
                 eprintln!("Błąd: {}", err);
             }
         }
