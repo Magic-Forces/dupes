@@ -31,10 +31,17 @@ fn process_duplicates(directory: &str, target_dir: Option<&str>) -> io::Result<(
     for entry in WalkDir::new(directory).into_iter().filter_map(Result::ok) {
         let path = entry.path();
 
+        if path.is_dir() {
+            println!("Przetwarzanie folderu: {}", path.display());
+        }
+
         if path.is_file() {
+            println!("Skanowanie pliku: {}", path.display());
+
             match compute_sha256(path) {
                 Ok(sha256) => {
                     if let Some(existing_path) = checksums.get(&sha256) {
+                        println!("\x1b[31mZduplikowany plik: {}\x1b[0m", path.display());
                         if path.to_string_lossy().len() < existing_path.len() {
                             let relative_path = path.strip_prefix(directory).unwrap_or(path);
                             let new_path = target_path.unwrap().join(relative_path);
